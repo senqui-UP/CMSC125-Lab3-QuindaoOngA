@@ -38,6 +38,7 @@ bool transfer(int tx_id, int from_id, int to_id, int amount)
     Account *to = &bank.accounts[to_id];
     pthread_rwlock_wrlock(&from->lock);
     from->lock_owner = tx_id;
+	printf("T%d acquired lock on account %d\n",tx_id,from_id);
     if (pthread_rwlock_trywrlock(&to->lock) != 0) {
         record_wait(tx_id,
                     to_id,
@@ -52,6 +53,7 @@ bool transfer(int tx_id, int from_id, int to_id, int amount)
     }
 
     to->lock_owner = tx_id;
+	printf("T%d acquired lock on account %d\n", tx_id, to_id);
 
     if (from->balance_centavos < amount) {
         pthread_rwlock_unlock(&to->lock);

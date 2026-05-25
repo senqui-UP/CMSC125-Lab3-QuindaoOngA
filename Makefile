@@ -26,3 +26,10 @@ clean:
 
 run: all
 	./$(TARGET)
+
+test: all
+	./$(TARGET) --trace=tests/trace_simple.txt
+	./$(TARGET) --trace=tests/trace_readers.txt
+	./$(TARGET) --trace=tests/trace_deadlock.txt
+	./$(TARGET) --trace=tests/trace_abort.txt
+	./$(TARGET) --trace=tests/trace_buffer.txt
