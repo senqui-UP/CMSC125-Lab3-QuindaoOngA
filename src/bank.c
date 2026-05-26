@@ -47,11 +47,6 @@ bool transfer(int tx_id, int from_id, int to_id, int amount) {
     if (pthread_rwlock_trywrlock(&to->lock) != 0) {
         record_wait(tx_id, to_id, to->lock_owner);
 
-        pthread_mutex_lock(&print_lock);
-        printf("[DEADLOCK PREVENTED] Lock ordering: T%d waiting for account %d\n",
-               tx_id, to_id);
-        pthread_mutex_unlock(&print_lock);
-
         if (detect_deadlock()) {
             pthread_mutex_lock(&print_lock);
             printf("[DEADLOCK DETECTED] Transaction %d aborted\n", tx_id);
@@ -60,6 +55,7 @@ bool transfer(int tx_id, int from_id, int to_id, int amount) {
             clear_wait(tx_id);
             return false;
         }
+
         pthread_rwlock_wrlock(&to->lock);
     }
 
