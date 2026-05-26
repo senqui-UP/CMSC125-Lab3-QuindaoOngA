@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "buffer_pool.h"
 #include "timer.h"
 #include "metrics.h"
