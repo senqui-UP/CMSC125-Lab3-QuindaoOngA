@@ -112,15 +112,16 @@ int main(int argc, char *argv[])
         &tick_ms);
 
     printf("=== Banking System Execution Log ===\n");
-
     printf("Timer thread started (tick interval: %dms)\n\n",
            tick_ms);
+    printf("\nTick 0:\n");
 
     // Start transaction threads
-    for (int i = 0;
-         i < transaction_count;
-         i++) {
+    for (int i = 0; 
+        i < transaction_count; 
+        i++) {
 
+        transactions[i].tx_id = i + 1;  // start from 1 not 0
         pthread_create(
             &transactions[i].thread,
             NULL,
