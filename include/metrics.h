@@ -7,6 +7,11 @@ typedef struct {
     int total_transactions;
     int committed;
     int aborted;
+    int buffer_loads;
+    int buffer_unloads;
+    int buffer_waits; 
+    int deadlocks_detected;
+    int deadlocks_prevented;
     pthread_mutex_t lock;
 } Metrics;
 

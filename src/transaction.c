@@ -48,16 +48,17 @@ void *execute_transaction(void *arg) {
             case OP_WITHDRAW:
                 pthread_mutex_lock(&print_lock);
                 printf("T%d started: WITHDRAW account %d amount PHP %d.%02d\n",
-                       tx->tx_id, op->account_id,
-                       op->amount_centavos / 100,
-                       op->amount_centavos % 100);
+                    tx->tx_id, op->account_id,
+                    op->amount_centavos / 100,
+                    op->amount_centavos % 100);
                 pthread_mutex_unlock(&print_lock);
 
                 wait_until_tick(current_tick + 1);
 
                 if (!withdraw(op->account_id, op->amount_centavos)) {
                     pthread_mutex_lock(&print_lock);
-                    printf("T%d aborted: insufficient funds\n", tx->tx_id);
+                    printf("[TX ABORTED] Transaction %d failed: Insufficient funds\n",
+                        tx->tx_id);
                     pthread_mutex_unlock(&print_lock);
 
                     tx->status = TX_ABORTED;

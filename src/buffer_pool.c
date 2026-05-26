@@ -1,4 +1,6 @@
 #include "buffer_pool.h"
+#include "timer.h"
+#include "metrics.h"
 
 // Global buffer pool instance
 // Simulates a limited in-memory cache of bank accounts
@@ -38,32 +40,47 @@ void init_buffer_pool(BufferPool *pool){
  * 4. Unlock the pool.
  * 5. Signal that a slot is now occupied.
  */
-void load_account(BufferPool *pool, int account_id){
+void load_account(BufferPool *pool, int account_id) {
+    // Check if we would block (pool is full)
+    int val;
+    sem_getvalue(&pool->empty_slots, &val);
 
-    // Block if buffer pool is full
+    if (val == 0) {
+        pthread_mutex_lock(&print_lock);
+        printf("[BUFFER POOL FULL] Account %d waiting for free slot\n",
+               account_id);
+        pthread_mutex_unlock(&print_lock);
+
+        pthread_mutex_lock(&metrics.lock);
+        metrics.buffer_waits++;
+        pthread_mutex_unlock(&metrics.lock);
+    }
+
+    // Block here if pool is full
     sem_wait(&pool->empty_slots);
 
     pthread_mutex_lock(&pool->pool_lock);
 
     for (int i = 0; i < BUFFER_POOL_SIZE; i++) {
-
-        // Find first available slot
         if (!pool->slots[i].in_use) {
-
             pool->slots[i].account_id = account_id;
-
-            // Store pointer to actual bank account data
             pool->slots[i].data = &bank.accounts[account_id];
-
             pool->slots[i].in_use = true;
+
+            pthread_mutex_lock(&print_lock);
+            printf("[BUFFER POOL] Account %d loaded into slot %d\n",
+                   account_id, i);
+            pthread_mutex_unlock(&print_lock);
 
             break;
         }
     }
 
-    pthread_mutex_unlock(&pool->pool_lock);
+    pthread_mutex_lock(&metrics.lock);
+    metrics.buffer_loads++;
+    pthread_mutex_unlock(&metrics.lock);
 
-    // Notify that a slot is now occupied
+    pthread_mutex_unlock(&pool->pool_lock);
     sem_post(&pool->full_slots);
 }
 
@@ -76,28 +93,32 @@ void load_account(BufferPool *pool, int account_id){
  * 5. Unlock the pool
  * 6. Signal that an empty slot is available
  */
-void unload_account(BufferPool *pool, int account_id)
-{
-    // Block if no loaded accounts exist
+
+void unload_account(BufferPool *pool, int account_id) {
     sem_wait(&pool->full_slots);
 
     pthread_mutex_lock(&pool->pool_lock);
 
     for (int i = 0; i < BUFFER_POOL_SIZE; i++) {
-
-        // Find matching loaded account
         if (pool->slots[i].in_use &&
             pool->slots[i].account_id == account_id) {
 
             pool->slots[i].in_use = false;
             pool->slots[i].account_id = -1;
 
+            pthread_mutex_lock(&print_lock);
+            printf("[BUFFER POOL] Account %d unloaded from slot %d\n",
+                   account_id, i);
+            pthread_mutex_unlock(&print_lock);
+
             break;
         }
     }
 
-    pthread_mutex_unlock(&pool->pool_lock);
+    pthread_mutex_lock(&metrics.lock);
+    metrics.buffer_unloads++;
+    pthread_mutex_unlock(&metrics.lock);
 
-    // Notify that a free slot is available
+    pthread_mutex_unlock(&pool->pool_lock);
     sem_post(&pool->empty_slots);
 }
