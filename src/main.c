@@ -146,18 +146,13 @@ int main(int argc, char *argv[])
 
     // Print final balances
     printf("\n=== Final Balances ===\n");
-
-    for (int i = 0;
-         i < MAX_ACCOUNTS;
-         i++) {
-
-        if (bank.accounts[i].balance_centavos
-            > 0) {
-
+    for (int i = 0; i < MAX_ACCOUNTS; i++) {
+        if (bank.accounts[i].account_id == i &&
+            bank.accounts[i].balance_centavos > 0) {
             printf("Account %d : PHP %d.%02d\n",
-                   bank.accounts[i].account_id,
-                   bank.accounts[i].balance_centavos / 100,
-                   bank.accounts[i].balance_centavos % 100);
+                i,
+                bank.accounts[i].balance_centavos / 100,
+                bank.accounts[i].balance_centavos % 100);
         }
     }
 

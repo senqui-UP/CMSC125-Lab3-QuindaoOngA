@@ -9,11 +9,39 @@
 
 // External transaction storage
 extern Transaction transactions[MAX_TRANSACTIONS];
-
 extern int transaction_count;
 
 // Global bank instance
 extern Bank bank;
+
+// Internal helper: find an existing transaction slot by name, or allocate a new one                                       */
+static char tx_names[MAX_TRANSACTIONS][16];
+ 
+static Transaction *find_or_create_tx(const char *tx_name, int start_tick)
+{
+    // Search existing transactions for a matching name
+    for (int i = 0; i < transaction_count; i++) {
+        if (strcmp(tx_names[i], tx_name) == 0) {
+            return &transactions[i];
+        }
+    }
+ 
+    // Not found — allocate a new transaction slot
+    Transaction *tx  = &transactions[transaction_count];
+    tx->tx_id        = transaction_count;
+    tx->start_tick   = start_tick;      // first line for this tx sets the start tick
+    tx->num_ops      = 0;
+    tx->status       = TX_RUNNING;
+    tx->actual_start = 0;
+    tx->actual_end   = 0;
+    tx->wait_ticks   = 0;
+ 
+    strncpy(tx_names[transaction_count], tx_name, 15);
+    tx_names[transaction_count][15] = '\0';
+ 
+    transaction_count++;
+    return tx;
+}
 
 // Load initial account balances from file
 void load_accounts(const char *filename)
@@ -82,16 +110,19 @@ void load_transactions(const char *filename)
         exit(EXIT_FAILURE);
     }
 
+    // Reset states
+    transaction_count = 0;
+    memset(tx_names, 0, sizeof(tx_names));
+
     char line[256];
 
-    transaction_count = 0;
 
     while (fgets(line,
                  sizeof(line),
                  fp)) {
 
-        // Skip comments
-        if (line[0] == '#') {
+        // Skip comments and blank lines
+        if (line[0] == '#' || line[0] == '\n' || line[0] == '\r') {
 
             continue;
         }
@@ -115,30 +146,13 @@ void load_transactions(const char *filename)
                    &target_account,
                    &amount) == 5) {
 
-            Transaction *tx =
-                &transactions[transaction_count];
+            Transaction *tx = find_or_create_tx(tx_name, start_tick);
 
-            tx->tx_id =
-                transaction_count;
-
-            tx->start_tick =
-                start_tick;
-
-            tx->num_ops = 1;
-
-            tx->ops[0].type =
-                OP_TRANSFER;
-
-            tx->ops[0].account_id =
-                account_id;
-
-            tx->ops[0].target_account =
-                target_account;
-
-            tx->ops[0].amount_centavos =
-                amount;
-
-            transaction_count++;
+            Operation *op       = &tx->ops[tx->num_ops++];
+            op->type            = OP_TRANSFER;
+            op->account_id      = account_id;
+            op->target_account  = target_account;
+            op->amount_centavos = amount;
 
             continue;
         }
@@ -151,27 +165,12 @@ void load_transactions(const char *filename)
                    &account_id,
                    &amount) == 4) {
 
-            Transaction *tx =
-                &transactions[transaction_count];
+            Transaction *tx = find_or_create_tx(tx_name, start_tick);
 
-            tx->tx_id =
-                transaction_count;
-
-            tx->start_tick =
-                start_tick;
-
-            tx->num_ops = 1;
-
-            tx->ops[0].type =
-                OP_DEPOSIT;
-
-            tx->ops[0].account_id =
-                account_id;
-
-            tx->ops[0].amount_centavos =
-                amount;
-
-            transaction_count++;
+            Operation *op       = &tx->ops[tx->num_ops++];
+            op->type            = OP_DEPOSIT;
+            op->account_id      = account_id;
+            op->amount_centavos = amount;
 
             continue;
         }
@@ -184,27 +183,12 @@ void load_transactions(const char *filename)
                    &account_id,
                    &amount) == 4) {
 
-            Transaction *tx =
-                &transactions[transaction_count];
+            Transaction *tx = find_or_create_tx(tx_name, start_tick);
 
-            tx->tx_id =
-                transaction_count;
-
-            tx->start_tick =
-                start_tick;
-
-            tx->num_ops = 1;
-
-            tx->ops[0].type =
-                OP_WITHDRAW;
-
-            tx->ops[0].account_id =
-                account_id;
-
-            tx->ops[0].amount_centavos =
-                amount;
-
-            transaction_count++;
+            Operation *op       = &tx->ops[tx->num_ops++];
+            op->type            = OP_WITHDRAW;
+            op->account_id      = account_id;
+            op->amount_centavos = amount;
 
             continue;
         }
@@ -216,25 +200,15 @@ void load_transactions(const char *filename)
                    &start_tick,
                    &account_id) == 3) {
 
-            Transaction *tx =
-                &transactions[transaction_count];
+            Transaction *tx = find_or_create_tx(tx_name, start_tick);
 
-            tx->tx_id =
-                transaction_count;
+            Operation *op       = &tx->ops[tx->num_ops++];
+            op->type            = OP_BALANCE;
+            op->account_id      = account_id;
 
-            tx->start_tick =
-                start_tick;
-
-            tx->num_ops = 1;
-
-            tx->ops[0].type =
-                OP_BALANCE;
-
-            tx->ops[0].account_id =
-                account_id;
-
-            transaction_count++;
+            continue;
         }
+
     }
 
     fclose(fp);

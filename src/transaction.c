@@ -76,9 +76,9 @@ void *execute_transaction(void *arg) {
             case OP_TRANSFER:
                 pthread_mutex_lock(&print_lock);
                 printf("T%d started: TRANSFER from %d to %d amount PHP %d.%02d\n",
-                    tx->tx_id, op->account_id, op->target_account,
-                    op->amount_centavos / 100,
-                    op->amount_centavos % 100);
+                        tx->tx_id, op->account_id, op->target_account,
+                        op->amount_centavos / 100,
+                        op->amount_centavos % 100);
                 pthread_mutex_unlock(&print_lock);
 
                 // Lock acquisition on next tick
@@ -105,11 +105,16 @@ void *execute_transaction(void *arg) {
             case OP_BALANCE:
                 pthread_mutex_lock(&print_lock);
                 printf("T%d started: BALANCE account %d\n",
-                       tx->tx_id, op->account_id);
+                        tx->tx_id, op->account_id);
+                pthread_mutex_unlock(&print_lock);
+
+                wait_until_tick(current_tick + 1);  // <-- span one tick
+
+                pthread_mutex_lock(&print_lock);
                 printf("T%d: Account %d balance = PHP %d.%02d\n",
-                       tx->tx_id, op->account_id,
-                       get_balance(op->account_id) / 100,
-                       get_balance(op->account_id) % 100);
+                        tx->tx_id, op->account_id,
+                        get_balance(op->account_id) / 100,
+                        get_balance(op->account_id) % 100);
                 pthread_mutex_unlock(&print_lock);
                 break;
         }
