@@ -11,6 +11,7 @@ typedef struct {
     int balance_centavos;    // Balance in centavos
     pthread_rwlock_t lock;   // Per-account lock
     int lock_owner;          // For deadlock detection
+    pthread_mutex_t owner_lock;
 
 } Account;
 

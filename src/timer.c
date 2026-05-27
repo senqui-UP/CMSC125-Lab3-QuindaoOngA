@@ -3,6 +3,8 @@
 #include "timer.h"
 
 volatile int global_tick = 0;
+pthread_mutex_t simulation_lock =
+    PTHREAD_MUTEX_INITIALIZER;
 bool simulation_running = true;
 
 pthread_mutex_t tick_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -12,7 +14,15 @@ pthread_mutex_t print_lock = PTHREAD_MUTEX_INITIALIZER;
 void *timer_thread(void *arg) {
     int tick_ms = *(int *)arg;
 
-    while (simulation_running) {
+     while (1) {
+
+        pthread_mutex_lock(&simulation_lock);
+        bool running = simulation_running;
+        pthread_mutex_unlock(&simulation_lock);
+
+        if (!running) {
+            break;
+        }
         usleep(tick_ms * 1000);
         pthread_mutex_lock(&tick_lock);
         global_tick++;

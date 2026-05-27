@@ -140,7 +140,9 @@ int main(int argc, char *argv[])
     }
 
     // Stop timer thread
+    pthread_mutex_lock(&simulation_lock);
     simulation_running = false;
+    pthread_mutex_unlock(&simulation_lock);
 
     pthread_join(timer, NULL);
 

@@ -91,6 +91,10 @@ void load_accounts(const char *filename)
                 &bank.accounts[account_id].lock,
                 NULL);
 
+            pthread_mutex_init(
+                &bank.accounts[account_id].owner_lock,
+                NULL);
+
             bank.num_accounts++;
         }
     }

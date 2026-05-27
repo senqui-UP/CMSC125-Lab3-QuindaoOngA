@@ -40,7 +40,9 @@ bool transfer(int tx_id, int from_id, int to_id, int amount){
 
 
     pthread_rwlock_wrlock(&from->lock);
+    pthread_mutex_lock(&from->owner_lock);
     from->lock_owner = tx_id;
+    pthread_mutex_unlock(&from->owner_lock);
 
     pthread_mutex_lock(&print_lock);
     printf("T%d acquired lock on account %d\n", tx_id, from_id);
@@ -50,7 +52,11 @@ bool transfer(int tx_id, int from_id, int to_id, int amount){
     if (pthread_rwlock_trywrlock(&to->lock) != 0) {
 
         // Could not get second lock — record the wait
-        record_wait(tx_id, to_id, to->lock_owner);
+        pthread_mutex_lock(&to->owner_lock);
+        int owner = to->lock_owner;
+        pthread_mutex_unlock(&to->owner_lock);
+
+record_wait(tx_id, to_id, owner);
 
         pthread_mutex_lock(&print_lock);
         printf("[LOCK WAIT] T%d waiting for account %d\n",
@@ -69,7 +75,9 @@ bool transfer(int tx_id, int from_id, int to_id, int amount){
             metrics.deadlocks_detected++;
             pthread_mutex_unlock(&metrics.lock);
 
+            pthread_mutex_lock(&from->owner_lock);
             from->lock_owner = -1;
+            pthread_mutex_unlock(&from->owner_lock);
 
             pthread_rwlock_unlock(&from->lock);
             clear_wait(tx_id);
@@ -81,15 +89,24 @@ bool transfer(int tx_id, int from_id, int to_id, int amount){
 
     } 
 
+    pthread_mutex_lock(&to->owner_lock);
     to->lock_owner = tx_id;
+    pthread_mutex_unlock(&to->owner_lock);
 
     pthread_mutex_lock(&print_lock);
     printf("T%d acquired lock on account %d\n", tx_id, to_id);
     pthread_mutex_unlock(&print_lock);
 
     if (from->balance_centavos < amount) {
+
+        pthread_mutex_lock(&from->owner_lock);
         from->lock_owner = -1;
+        pthread_mutex_unlock(&from->owner_lock);
+
+        pthread_mutex_lock(&to->owner_lock);
         to->lock_owner = -1;
+        pthread_mutex_unlock(&to->owner_lock);
+
         pthread_rwlock_unlock(&to->lock);
         pthread_rwlock_unlock(&from->lock);
         clear_wait(tx_id);
@@ -99,8 +116,13 @@ bool transfer(int tx_id, int from_id, int to_id, int amount){
     from->balance_centavos -= amount;
     to->balance_centavos   += amount;
 
+    pthread_mutex_lock(&from->owner_lock);
     from->lock_owner = -1;
+    pthread_mutex_unlock(&from->owner_lock);
+
+    pthread_mutex_lock(&to->owner_lock);
     to->lock_owner = -1;
+    pthread_mutex_unlock(&to->owner_lock);
 
     pthread_rwlock_unlock(&to->lock);
     pthread_rwlock_unlock(&from->lock);
