@@ -6,8 +6,6 @@
 
 Bank bank;
 
-// Forces transfers to acquire locks one at a time preventing the race where both threads grab their first lock simultaneously before either blocks
-static pthread_mutex_t transfer_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int get_balance(int account_id){
     Account *acc = &bank.accounts[account_id];
@@ -40,8 +38,6 @@ bool transfer(int tx_id, int from_id, int to_id, int amount){
     Account *from = &bank.accounts[from_id];
     Account *to   = &bank.accounts[to_id];
 
-    // Serialize lock acquisition so T1 and T2 cannot both grab their first lock at the same time
-    pthread_mutex_lock(&transfer_mutex);
 
     pthread_rwlock_wrlock(&from->lock);
     from->lock_owner = tx_id;
@@ -57,16 +53,12 @@ bool transfer(int tx_id, int from_id, int to_id, int amount){
         record_wait(tx_id, to_id, to->lock_owner);
 
         pthread_mutex_lock(&print_lock);
-        printf("[DEADLOCK PREVENTED] Lock ordering: T%d waiting for account %d\n",
+        printf("[LOCK WAIT] T%d waiting for account %d\n",
                tx_id, to_id);
         pthread_mutex_unlock(&print_lock);
 
-        pthread_mutex_lock(&metrics.lock);
-        metrics.deadlocks_prevented++;
-        pthread_mutex_unlock(&metrics.lock);
 
-        // Release transfer mutex so other transfers can proceed while checking for deadlock
-        pthread_mutex_unlock(&transfer_mutex);
+
 
         if (detect_deadlock()) {
             pthread_mutex_lock(&print_lock);
@@ -77,6 +69,8 @@ bool transfer(int tx_id, int from_id, int to_id, int amount){
             metrics.deadlocks_detected++;
             pthread_mutex_unlock(&metrics.lock);
 
+            from->lock_owner = -1;
+
             pthread_rwlock_unlock(&from->lock);
             clear_wait(tx_id);
             return false;
@@ -85,10 +79,7 @@ bool transfer(int tx_id, int from_id, int to_id, int amount){
         // If no cycle yet, block and wait for second lock
         pthread_rwlock_wrlock(&to->lock);
 
-    } else {
-        // Got both locks immediately, no deadlock possible
-        pthread_mutex_unlock(&transfer_mutex);
-    }
+    } 
 
     to->lock_owner = tx_id;
 
@@ -97,6 +88,8 @@ bool transfer(int tx_id, int from_id, int to_id, int amount){
     pthread_mutex_unlock(&print_lock);
 
     if (from->balance_centavos < amount) {
+        from->lock_owner = -1;
+        to->lock_owner = -1;
         pthread_rwlock_unlock(&to->lock);
         pthread_rwlock_unlock(&from->lock);
         clear_wait(tx_id);
@@ -105,6 +98,9 @@ bool transfer(int tx_id, int from_id, int to_id, int amount){
 
     from->balance_centavos -= amount;
     to->balance_centavos   += amount;
+
+    from->lock_owner = -1;
+    to->lock_owner = -1;
 
     pthread_rwlock_unlock(&to->lock);
     pthread_rwlock_unlock(&from->lock);

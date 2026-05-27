@@ -19,6 +19,5 @@ void print_metrics() {
     printf("Blocked operations (pool full): %d\n", metrics.buffer_waits);
 
     printf("\n=== Deadlock Statistics ===\n");
-    printf("Deadlocks prevented         : %d\n", metrics.deadlocks_prevented);
     printf("Deadlocks detected          : %d\n", metrics.deadlocks_detected);
 }
